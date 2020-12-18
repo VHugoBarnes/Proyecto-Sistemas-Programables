@@ -193,7 +193,8 @@ void verificarPassword() {
     delay(1000); // Espera 1 segundo
     lcd.clear();
     lcd.print("Pasa la tarjeta de acceso");
-    // ToDo: Llamar una función que lea la tarjeta rfid
+    // Llamar una función que lea la tarjeta rfid
+    verificarRfid();
   }
   else {
     lcd.clear();
@@ -253,35 +254,43 @@ void manejarEntradaPassword( char key ) {
 void verificarRfid() {
   // Revisamos si hay nuevas tarjetas presentes
   if ( mfrc522.PICC_IsNewCardPresent() ) {
-    // Seleccionamos una tarjeta
-    if ( mfrc522.PICC_ReadCardSerial() ) {
-      // Comparamos los UID para determinar si es uno de los usuarios
-      if ( compararArray(actualUID, usuario1) ) {
-        lcd.clear();
-        lcd.print("Acceso Concedido");
-        // Desbloqueamos la puerta
-        puerta.write(pueraDesbloqueada);
-        delay(tiempoEspera);
-        puerta.write(puertaBloqueada);
-        setup(); // Volver a inicializar los componentes, por si acaso
+      // Seleccionamos una tarjeta
+      if ( mfrc522.PICC_ReadCardSerial() ) {
+          // Comparamos los UID para determinar si es uno de los usuarios
+          if ( compararArray(actualUID, usuario1) ) {
+              lcd.clear();
+              lcd.print("Acceso Concedido");
+              // Desbloqueamos la puerta
+              puerta.write(pueraDesbloqueada);
+              delay(tiempoEspera);
+              puerta.write(puertaBloqueada);
+              setup(); // Volver a inicializar los componentes, por si acaso
+          }
+          else if ( compararArray(actualUID, usuario2) ) {
+              lcd.clear();
+              lcd.print("Acceso Concedido");
+              // Desbloqueamos la puerta
+              puerta.write(pueraDesbloqueada);
+              delay(tiempoEspera);
+              puerta.write(puertaBloqueada);
+              setup(); // Volver a inicializar los componentes, por si acaso
+          }
+          else {
+              lcd.clear();
+              lcd.print("Acceso denegado");
+          }
       }
-      else if ( compararArray(actualUID, usuario2) ) {
-        lcd.clear();
-        lcd.print("Acceso Concedido");
-        // Desbloqueamos la puerta
-        puerta.write(pueraDesbloqueada);
-        delay(tiempoEspera);
-        puerta.write(puertaBloqueada);
-        setup(); // Volver a inicializar los componentes, por si acaso
-      }
-      else {
-        lcd.clear();
-        lcd.print("Acceso denegado");
-      }
-    }
   }
 }
 
+/*
+ * compararArray
+ * 
+ * Su nombre lo dice, compara los contenidos de un array de 4.
+ * Usado para comparas las uid de tarjetas MIFARE
+ * 
+ * returns booblean;
+ */
 boolean compararArray(byte array1[],byte array2[]) {
   if(array1[0] != array2[0])return(false);
   if(array1[1] != array2[1])return(false);
