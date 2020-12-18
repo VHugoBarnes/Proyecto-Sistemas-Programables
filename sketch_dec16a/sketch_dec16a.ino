@@ -67,6 +67,10 @@ int pinMOSI = 11;
 int pinMISO = 12;
 int pinRST = 9;
 MFRC522 mfrc522(pinSDA, pinRST); // Creamos el objeto para el RC522
+// Identificaciones
+byte actualUID[4]; // Almacenará el código del tag leído
+byte usuario1[4] = {0xE5, 0xE7, 0x26, 0x23}; // Tarjeta
+byte usuario2[4] = {0xA9, 0x61, 0xDD, 0xA2}; // Llavero
 
 /************************************** Display LCD **************************************/
 // Crear el objeto para el LCD Display con I2C y lo almacena en la dirección 0x3F
@@ -236,4 +240,52 @@ void manejarEntradaPassword( char key ) {
     verificarPassword(); // Invocamos la función
   }
   
+}
+
+/*
+ * verificarRfid
+ * 
+ * Maneja la entrada de tarjetas RFID y acciona el servomotor si 
+ * es correcta.
+ * 
+ * returns void;
+ */
+void verificarRfid() {
+  // Revisamos si hay nuevas tarjetas presentes
+  if ( mfrc522.PICC_IsNewCardPresent() ) {
+    // Seleccionamos una tarjeta
+    if ( mfrc522.PICC_ReadCardSerial() ) {
+      // Comparamos los UID para determinar si es uno de los usuarios
+      if ( compararArray(actualUID, usuario1) ) {
+        lcd.clear();
+        lcd.print("Acceso Concedido");
+        // Desbloqueamos la puerta
+        puerta.write(pueraDesbloqueada);
+        delay(tiempoEspera);
+        puerta.write(puertaBloqueada);
+        setup(); // Volver a inicializar los componentes, por si acaso
+      }
+      else if ( compararArray(actualUID, usuario2) ) {
+        lcd.clear();
+        lcd.print("Acceso Concedido");
+        // Desbloqueamos la puerta
+        puerta.write(pueraDesbloqueada);
+        delay(tiempoEspera);
+        puerta.write(puertaBloqueada);
+        setup(); // Volver a inicializar los componentes, por si acaso
+      }
+      else {
+        lcd.clear();
+        lcd.print("Acceso denegado");
+      }
+    }
+  }
+}
+
+boolean compararArray(byte array1[],byte array2[]) {
+  if(array1[0] != array2[0])return(false);
+  if(array1[1] != array2[1])return(false);
+  if(array1[2] != array2[2])return(false);
+  if(array1[3] != array2[3])return(false);
+  return(true);
 }
