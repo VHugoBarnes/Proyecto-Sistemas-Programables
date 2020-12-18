@@ -17,11 +17,7 @@
  *                        b. Si es incorrecta pasa al paso 1
  *                        c. Si falla 4 veces se bloquea la entrada por 1 minuto, así hasta bloquearlo por 10 hrs
  *                    2. Pedir la tarjeta.
- *                        a. Dar un lapso de 1 minuto después de introducir la contraseña para pasar la tarjeta.
- *                        b. Si pasa un minuto, pedir el llavero también.
- *                            - Si se tarda un minuto en poner el llavero también, se bloquea el sistema por 20 minutos.
- *                        c. Si pasa la tarjeta bien, antes del minuto, acciona el servomotor
- *                    3. Accionar el servomotor para quitar el seguro de la puerta
+ *                    3. Accionar el servomotor para quitar el seguro de la puerta si la tarjeta es correcta
  *                    4. Mostrar en el display que la puerta ha sido desbloqueada
  *                    5. Al cabo de 20segs se volverá a bloquear el seguro
 ***********************************************************************************************/
@@ -101,7 +97,8 @@ char nuevaContrasena[6]; // Caracter por caracter de nuevaContrasenaString
 Password password = Password("3645");
 byte longitudMaximaPassword = 6; // La cantidad máxima de caracteres para la contraseña
 byte longitudActualPassword = 0; // Cantidad actual de caracteres ingresados (por defecto 0)
-
+int intentosPassword = 0; // Cuantos intentos de ingresar la contraseña ha hecho
+int intentosMaximosPassword = 4;
 
 /************************** Configurando pines para el Arduino MEGA ***************************/
 
@@ -196,11 +193,19 @@ void verificarPassword() {
     // Llamar una función que lea la tarjeta rfid
     verificarRfid();
   }
+  // Si la contraseña es incorrecta
   else {
-    lcd.clear();
-    lcd.print("Acceso denegado");
-    delay(10000);
-    setup(); // Llama setup para posteriormente comenzar el loop de nuevo
+    if (intentosPassword != intentosMaximoPassword) {
+        lcd.clear();
+        lcd.print("Acceso denegado");
+        delay(10000);
+        intentosPassword++; // Incrementamos en 1 los intentos
+        setup(); // Llama setup para posteriormente comenzar el loop de nuevo
+    } else { // Quiere decir que ya uso sus 4 intentos
+      lcd.clear();
+      lcd.print("Sistema bloqueado temporalmente");
+      delay(30000); // Se bloquea por 30 segs
+    }
   }
   
 }
@@ -268,7 +273,7 @@ void verificarRfid() {
           }
           else if ( compararArray(actualUID, usuario2) ) {
               lcd.clear();
-              lcd.print("Acceso Concedido");
+              lcd.print("Acceso Concedido, puerta desbloqueada");
               // Desbloqueamos la puerta
               puerta.write(pueraDesbloqueada);
               delay(tiempoEspera);
