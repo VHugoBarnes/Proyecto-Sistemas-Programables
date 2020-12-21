@@ -15,7 +15,6 @@
  *                    1. Pedir la contraseña
  *                        a. Si la contraseña es correcta, pasa al paso 2
  *                        b. Si es incorrecta pasa al paso 1
- *                        c. Si falla 4 veces se bloquea la entrada por 1 minuto, así hasta bloquearlo por 10 hrs
  *                    2. Pedir la tarjeta.
  *                    3. Accionar el servomotor para quitar el seguro de la puerta si la tarjeta es correcta
  *                    4. Mostrar en el display que la puerta ha sido desbloqueada
@@ -27,9 +26,7 @@
 #include <Servo.h>
 // RFID
 #include <MFRC522.h>
-#include <deprecated.h>
 #include <MFRC522Extended.h>
-#include <require_cpp11.h>
 #include <SPI.h>
 // Keypad
 #include <Key.h>
@@ -128,7 +125,6 @@ void setup() {
   SPI.begin(); // Iniciamos el bus SPI
   mfrc522.PCD_Init(); // Iniciamos el MFRC522
   /******************************** RFID ************************************/
-  
 
 }
 
@@ -136,8 +132,6 @@ void loop() {
   // put your main code here, to run repeatedly:
 
   /***************************** Por si pulsamos el botón **************************/
-  // Obtenemos la tecla pulsada
-  char key = keypad.getKey();  
   // Almacenamos el estado del botón
   estadoBoton = digitalRead(pinBoton);
   // Preguntamos si está presionado, para accionar el servomotor
@@ -195,7 +189,7 @@ void verificarPassword() {
   }
   // Si la contraseña es incorrecta
   else {
-    if (intentosPassword != intentosMaximoPassword) {
+    if (intentosPassword != intentosMaximosPassword) {
         lcd.clear();
         lcd.print("Acceso denegado");
         delay(10000);
@@ -205,6 +199,7 @@ void verificarPassword() {
       lcd.clear();
       lcd.print("Sistema bloqueado temporalmente");
       delay(30000); // Se bloquea por 30 segs
+      intentosPassword = 0;
     }
   }
   
@@ -233,10 +228,10 @@ void resetPassword() {
  * 
  * Maneja la entrada de las teclas
  * 
+ * 
  * retunrs void;
  */
 void manejarEntradaPassword( char key ) {
-  longitudActualPassword++; // Aumentar en 1 la longitud
   password.append( key ); // Agregar la key a la contraseña para comparar
   lcd.print("*"); // Podríamos imprimir lo que ingresa, pero mejor el * para mayor seguridad
 
@@ -245,6 +240,7 @@ void manejarEntradaPassword( char key ) {
   if ( longitudActualPassword == longitudMaximaPassword ) {
     verificarPassword(); // Invocamos la función
   }
+  longitudActualPassword++; // Aumentar en 1 la longitud
   
 }
 
@@ -283,6 +279,8 @@ void verificarRfid() {
           else {
               lcd.clear();
               lcd.print("Acceso denegado");
+              delay(tiempoEspera);
+              setup();
           }
       }
   }
