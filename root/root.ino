@@ -19,6 +19,7 @@
  *                    3. Accionar el servomotor para quitar el seguro de la puerta si la tarjeta es correcta
  *                    4. Mostrar en el display que la puerta ha sido desbloqueada
  *                    5. Al cabo de 20segs se volverá a bloquear el seguro
+ *                    6. Si esta dentro del cuarto, y si pulsa el botón, desbloquear puerta
 ***********************************************************************************************/
 
 /************************************** Librerías usadas **************************************/
@@ -42,23 +43,23 @@
 /************************************** Servomotor **************************************/
 // Pines para el Servomotor
 Servo puerta;  // Creamos un objeto de tipo Servo
-int pinServo = 5;
-int puertaBloqueada = 100; // Por defecto los 100° son para tener bloqueada la puerta
-int pueraDesbloqueada = -180; // Por defecto los -180° son para tener desbloqueada la puerta
+int pinServo = 6;
+int puertaBloqueada = 90; // Por defecto los 100° son para tener bloqueada la puerta
+int pueraDesbloqueada = 180; // Por defecto los -180° son para tener desbloqueada la puerta
 int tiempoEspera = 10000; // El tiempo de espera para que el servomotor cambie de ángulo, 10000 son 10 segundos.
 
 /************************************** Botón **************************************/
 // Pines para el botón
-int pinBoton = 6;
-int estadoBoton = 0;
+int pinBoton = 7;
+//int estadoBoton = 0;
 
 /************************************** RFID **************************************/
 // Pines para el RFID
-int pinSDA = 10;
-int pinSCK = 13;
-int pinMOSI = 11;
-int pinMISO = 12;
-int pinRST = 9;
+int pinRST = 5; // Amarilla
+int pinSDA = 53; // Verde
+int pinMOSI = 51; // Naranja
+int pinMISO = 50; // Morada
+int pinSCK = 52; // Azul
 MFRC522 mfrc522(pinSDA, pinRST); // Creamos el objeto para el RC522
 // Identificaciones
 byte actualUID[4]; // Almacenará el código del tag leído
@@ -67,7 +68,7 @@ byte usuario2[4] = {0xA9, 0x61, 0xDD, 0xA2}; // Llavero
 
 /************************************** Display LCD **************************************/
 // Crear el objeto para el LCD Display con I2C y lo almacena en la dirección 0x3F
-LiquidCrystal_I2C lcd(0x3F, 20, 4);
+LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 /************************************** Keypad 4x4 **************************************/
 // Configuración para el Keypad 4x4
@@ -75,16 +76,16 @@ const byte FILAS = 4;
 const byte COLUMNAS = 4;
 // Arreglo bidimensional para implementar el teclado
 char keys[FILAS][COLUMNAS] = {
-  {'1','2','3','A'},
+  {'1','2','3','*'},
 
-  {'4','5','6','B'},
+  {'4','5','6','#'},
 
-  {'7','8','9','C'},
+  {'7','8','9','0'},
 
-  {'*','0','#','D'}
+  {'-','.',',','|'}
 };
-byte pinFilaKeyPad[FILAS] = {30, 31, 32, 33}; // Pines para el Keypad 4x4
-byte pinColumnaKeyPad[COLUMNAS] = {34, 35, 36, 37,}; // Pines para el Keypad 4x4
+byte pinFilaKeyPad[FILAS] = {34,35,36,37}; // Pines para el Keypad 4x4
+byte pinColumnaKeyPad[COLUMNAS] = {30,31,32,33}; // Pines para el Keypad 4x4
 Keypad keypad = Keypad(makeKeymap(keys), pinFilaKeyPad, pinColumnaKeyPad, FILAS, COLUMNAS);
 
 /************************************** Contraseña **************************************/
@@ -114,12 +115,16 @@ void setup() {
   lcd.clear();
   lcd.print("Contrasena: ");
   /******************************** LCD *************************************/
-
+  Serial.begin(9600);
   /******************************** SERVO ************************************/
   puerta.attach(pinServo);     // El pin al que estará conectado
   puerta.write(puertaBloqueada); // Pone el servomotor en los grados que le especificamos
   pinMode(pinServo, OUTPUT); // Establecemos que el pin será de salida
   /******************************** SERVO ************************************/
+
+  /******************************** BOTON ************************************/
+  pinMode(pinBoton, INPUT_PULLUP);
+  /******************************** BOTON ************************************/
 
   /******************************** RFID ************************************/
   SPI.begin(); // Iniciamos el bus SPI
@@ -133,9 +138,10 @@ void loop() {
 
   /***************************** Por si pulsamos el botón **************************/
   // Almacenamos el estado del botón
-  estadoBoton = digitalRead(pinBoton);
+  int estadoBoton = digitalRead(pinBoton);
   // Preguntamos si está presionado, para accionar el servomotor
-  if (estadoBoton == HIGH) {
+  if (estadoBoton == LOW) {
+    Serial.println("LOW");
     // Desbloqueamos la puerta
     puerta.write(pueraDesbloqueada);
     delay(tiempoEspera);
@@ -150,12 +156,13 @@ void loop() {
 
   // Condición que revisa si pulsamos la tecla
   if ( key != NO_KEY ) {
+    Serial.println(key);
     delay(60);  // Espera de 60ms para que no se pulse tan rápido las teclas
     switch( key ) {
       case 'A': break; // Si pulsamos la tecla 'A' se cancela
       case 'B': break; // Si pulsamos la tecla 'B' se cancela
       case 'C': break; // Si pulsamos la tecla 'C' se cancela
-      case '#': verificarPassword(); break; // Si pulsamos la tecla '#' verifica la contraseña
+      case '#': Serial.println(key);verificarPassword(); break; // Si pulsamos la tecla '#' verifica la contraseña
       case '*': resetPassword(); break; // Si pulsamos la tecla '*' se borra todo lo que ingresaste
       default: manejarEntradaPassword( key ); // Caso por defecto, si pulsamos cualquier otra tecla
     }
@@ -179,23 +186,29 @@ void verificarPassword() {
 
   // Si la contraseña es correcta
   if ( password.evaluate() ) {
+    longitudActualPassword = 0;
     lcd.clear(); // Limpia el LCD
-    lcd.print("Contraseña correcta");
+    lcd.print("Contrasena correcta");
     delay(1000); // Espera 1 segundo
     lcd.clear();
     lcd.print("Pasa la tarjeta de acceso");
+    password.reset(); // Reset de la contraseña que se está ingresando
     // Llamar una función que lea la tarjeta rfid
     verificarRfid();
   }
   // Si la contraseña es incorrecta
   else {
     if (intentosPassword != intentosMaximosPassword) {
+        longitudActualPassword = 0;
+        password.reset(); // Reset de la contraseña que se está ingresando
         lcd.clear();
-        lcd.print("Acceso denegado");
+        lcd.print("Contrasena Incorrecta");
         delay(10000);
         intentosPassword++; // Incrementamos en 1 los intentos
         setup(); // Llama setup para posteriormente comenzar el loop de nuevo
     } else { // Quiere decir que ya uso sus 4 intentos
+      longitudActualPassword = 0;
+      password.reset(); // Reset de la contraseña que se está ingresando
       lcd.clear();
       lcd.print("Sistema bloqueado temporalmente");
       delay(30000); // Se bloquea por 30 segs
@@ -213,13 +226,14 @@ void verificarPassword() {
  * el LCD.
  * 
  * returns void;
+ * 
  *
  */
 void resetPassword() {
   password.reset(); // Reset de la contraseña que se está ingresando
   longitudActualPassword = 0; // Restablecemos la longitud actual a 0
   lcd.clear(); // Limpiamos la pantalla
-  
+  lcd.print("Contrasena: ");
 }
 
 /*
@@ -232,15 +246,18 @@ void resetPassword() {
  * retunrs void;
  */
 void manejarEntradaPassword( char key ) {
+  
+  longitudActualPassword++; // Aumentar en 1 la longitud
   password.append( key ); // Agregar la key a la contraseña para comparar
-  lcd.print("*"); // Podríamos imprimir lo que ingresa, pero mejor el * para mayor seguridad
+  lcd.print(key); // Podríamos imprimir lo que ingresa, pero mejor el * para mayor seguridad
 
   // Si se llega al limite de caracteres pasar a verificar en 
   // lugar de pulsar '#' para hacerlo
+  Serial.print("longitud actual: ");
+  Serial.println(longitudActualPassword);
   if ( longitudActualPassword == longitudMaximaPassword ) {
     verificarPassword(); // Invocamos la función
   }
-  longitudActualPassword++; // Aumentar en 1 la longitud
   
 }
 
@@ -254,35 +271,56 @@ void manejarEntradaPassword( char key ) {
  */
 void verificarRfid() {
   // Revisamos si hay nuevas tarjetas presentes
-  if ( mfrc522.PICC_IsNewCardPresent() ) {
+  Serial.println("Tarjeta RFID");
+  boolean hayTarjeta = false;
+  boolean estaLeyendo = false;
+
+  while ( !hayTarjeta ) { // Estara en el bucle mientras no haya una tarjeta
+
+    if ( mfrc522.PICC_IsNewCardPresent() ) {
+      hayTarjeta = true;
       // Seleccionamos una tarjeta
-      if ( mfrc522.PICC_ReadCardSerial() ) {
-          // Comparamos los UID para determinar si es uno de los usuarios
-          if ( compararArray(actualUID, usuario1) ) {
-              lcd.clear();
-              lcd.print("Acceso Concedido");
-              // Desbloqueamos la puerta
-              puerta.write(pueraDesbloqueada);
-              delay(tiempoEspera);
-              puerta.write(puertaBloqueada);
-              setup(); // Volver a inicializar los componentes, por si acaso
-          }
-          else if ( compararArray(actualUID, usuario2) ) {
-              lcd.clear();
-              lcd.print("Acceso Concedido, puerta desbloqueada");
-              // Desbloqueamos la puerta
-              puerta.write(pueraDesbloqueada);
-              delay(tiempoEspera);
-              puerta.write(puertaBloqueada);
-              setup(); // Volver a inicializar los componentes, por si acaso
-          }
-          else {
-              lcd.clear();
-              lcd.print("Acceso denegado");
-              delay(tiempoEspera);
-              setup();
-          }
+      Serial.println("RFID presente");
+
+      while ( !estaLeyendo ) {
+
+        if ( mfrc522.PICC_ReadCardSerial() ) {
+          estaLeyendo = true;
+          Serial.println("Seleccionando RFID");
+          mfrc522.PICC_DumpToSerial(&(mfrc522.uid));
+            // Comparamos los UID para determinar si es uno de los usuarios
+            if ( isEqualArray(mfrc522.uid.uidByte, usuario1, 4) ) {
+              Serial.println("Comparando Arrays");
+                lcd.clear();
+                lcd.print("Acceso Concedido, puerta desbloqueada");
+                // Desbloqueamos la puerta
+                puerta.write(pueraDesbloqueada);
+                delay(tiempoEspera);
+                puerta.write(puertaBloqueada);
+                setup(); // Volver a inicializar los componentes, por si acaso
+            }
+            else if ( isEqualArray(mfrc522.uid.uidByte, usuario2, 4) ) {
+              Serial.println("Comparando Arrays");
+                lcd.clear();
+                lcd.print("Acceso Concedido, puerta desbloqueada");
+                // Desbloqueamos la puerta
+                puerta.write(pueraDesbloqueada);
+                delay(tiempoEspera);
+                puerta.write(puertaBloqueada);
+                setup(); // Volver a inicializar los componentes, por si acaso
+            }
+            else {
+                lcd.clear();
+                lcd.print("Acceso denegado, credencial incorrecta");
+                delay(tiempoEspera);
+                setup();
+            }
+        }
+        
       }
+      
+    }
+    
   }
 }
 
@@ -294,10 +332,11 @@ void verificarRfid() {
  * 
  * returns booblean;
  */
-boolean compararArray(byte array1[],byte array2[]) {
-  if(array1[0] != array2[0])return(false);
-  if(array1[1] != array2[1])return(false);
-  if(array1[2] != array2[2])return(false);
-  if(array1[3] != array2[3])return(false);
-  return(true);
+bool isEqualArray(byte* arrayA, byte* arrayB, int length)
+{
+  for (int index = 0; index < length; index++)
+  {
+    if (arrayA[index] != arrayB[index]) return false;
+  }
+  return true;
 }
